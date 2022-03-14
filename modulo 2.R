@@ -1,37 +1,29 @@
-rm(list = ls())
+rm(list = ls()) #puliamo il nostro environment
+
+#carichiamo i pacchetti necessari
+#se questi non fossero presenti, possiamo installarli, ad esempio:
+install.packages("tidyverse") #il nome del pacchetto, con install.packages, va tra virgolette
 library(tidyverse)
 library(epiR)
 library(epitools)
 library(pROC)
 
-dest.file = paste0(getwd(),"/corsoSE_mod2.R")
-url.link = "https://ricerca.sigg.it/corsoSE_mod2.R"
-download.file(url.link,dest.file)
-source("corsoSE_mod2.R")
-
 #####################MISURE DI ASSOCIAZIONE##########################
-
+#carichiamo il dataset OSWEGO
 data("oswego")
-?oswego
+?oswego #capiamo di più su questi dati
 
+#1) una malattia gastrointestinale acuta ha colpito diverse persone nella contea di Oswego
+#2) tutte le persone malate hanno mangiato ad una cena
+#3) il nostro obiettivo è capire QUALE CIBO HA CAUSATO LA MALATTIA?
+
+#guardiamo la struttura dei nostri dati
 str(oswego)
-#AIM: quale cibo ha causato la malattia?
-#che caratteristiche ti aspetti da questo cibo?
-#
-#
-#
-#
-#proporzione di malati?
-#
-#
-#
-table(oswego$ill) %>% prop.table
-#
-#
-#
-#
-#
-#
+
+#iniziamo a capire la proporzione di malati
+table(oswego$ill) %>% prop.table #61.3%
+
+#che cosa mi aspetto dal cibo che è causa di malattia?
 table(oswego$baked.ham,oswego$ill) %>% prop.table(.,1) 
 
 # qual ? il rischio di essere malati per chi ha mangiato il prosciutto?
