@@ -24,7 +24,118 @@ str(oswego)
 table(oswego$ill) %>% prop.table #61.3%
 
 #che cosa mi aspetto dal cibo che è causa di malattia?
-table(oswego$baked.ham,oswego$ill) %>% prop.table(.,1) 
+#in generale, potrei dire che la proporzione di malati tra coloro i quali hanno mangiato il cibo "colpevole"
+#sia MAGGIORE rispetto a quella che ritrovo tra gli altri (= quelli che non hanno mangiato il cibo colpevole)
+#la proporzione di malati tra coloro esposti o non esposti ad un alimento prende il nome di RISCHIO.
+#il rapporto tra due rischi, si chiama RISK RATIO ed è una misura di associazione
+
+#prendiamo un cibo qualsiasi
+table(oswego$baked.ham,oswego$ill)
+#calcoliamo la proporzione di malati tra coloro che hanno mangiato il cibo e coloro i quali non lo hanno assunto
+table(oswego$baked.ham, oswego$ill) %>% prop.table(1) #prima le righe, poi le colonne. prop.table(1) calcola % di riga
+
+#il 63% di coloro i quali hanno mangiato baked.ham si sono ammalati (rischio = .63)
+#il 58.6% di coloro i quali non hanno mangiato baked.ham si sono ammalati (rischio = .586)
+#il risk ratio è 
+.63/.586 #= 1.075
+
+#un'altra misura di associazione spesso utilizzata è l' ODDS RATIO
+#l'odds ratio si basa sul rapporto tra ODDS. L'odds negli esposti è (N. malati esposti)/(N. non-malati esposti)
+#nel nostro esempio
+table(oswego$baked.ham, oswego$ill)
+29/17 #1.71 odds negli esposti
+17/12 #1.41 odds nei non esposti
+#odds ratio =
+1.71/1.41 #1.21
+
+#L' odds è una misura surrogata del rischio. L'odds approssima il rischio quando la prevalenza della malattia è bassa
+
+bassa.prev <- c(95,5,90,10) %>% matrix(ncol = 2, byrow = T)
+bassa.prev
+# rischio non esposti
+5/100 #= .05
+# rischio esposti
+10/100 #= .10
+#odds non esposti
+5/95 #=.053
+#odds esposti
+10/90 #=.11
+#RR
+.10/.05 #= 2
+#OR
+.11/.053 #= 2.07
+
+alta.prev <- c(50,50,30,70) %>% matrix(ncol = 2, byrow = T)
+alta.prev
+#rischio non esposti
+50/100 #= .5
+#rischio esposti
+70/100 #=.7
+#odds non esposti
+50/50 # = 1
+#odds esposti
+70/30 #= 2.33
+#RR
+.7/.5 #=1.4
+#OR
+2.33/1 #2.33
+
+#l'OR offre il vantaggio di poter essere calcolato come rapporto crociato (a*c) / (b*d)
+alta.prev
+(50*70)/(50*30) #2.33
+#questo permette di calcolare l'OR anche negli studi caso-controllo, quando le percentuali di riga perdono di senso
+#negli studi caso-controllo, infatti, è il ricercatore che stabilisce il rapporto tra malati e non malati (casi e controlli)
+
+
+#creaiamo una formula per calcolare RR e OR
+calcolo_RR_OR <- function(exposure, outcome, dat) { #la mia funzione vorrà tre argomenti. Exposure, outcome e dat sono "segnaposto" nella funzione
+  
+  #creo la mia tabella di contigenza 2x2
+  my.table <- table(dat[,exposure],dat[,outcome])
+  #calcolo il rischio e faccio il rapporto
+  #utilizzo prop.table
+  RR <- prop.table(my.table,1)[2,2] / prop.table(my.table,1)[1,2]
+  #per gli odds devo calcolare "a mano"
+  #nei non esposti
+  odds.non.exp <- my.table[1,2] / my.table[1,1]
+  #negli esposti
+  odds.exp <- my.table[2,2] / my.table[2,1] 
+  OR <- odds.exp/odds.non.exp
+  
+  #riporto i risultati
+  return(data.frame(exp = exposure,
+           RR = round(RR,3),
+           OR = round(OR,3))) 
+}
+#adesso faccio girare il codice della funzione, la nuova funzione comparirà nell'environment
+
+calcolo_RR_OR("baked.ham","ill",oswego)
+
+#possiamo applicare la funzione a tutti i cibi
+alimenti <- colnames(oswego)[8:21] #creo un vettore contenente tutti i cibi
+
+#uso una funzione della famiglia "apply".
+
+lapply(alimenti, function(x) {              #applica la funzione a tutti gli elementi di "alimenti"
+        calcolo_RR_OR(x,"ill",oswego)       #ogni alimento, a turno, prederà il posto di "x" nella funzione
+      }) %>% bind_rows() -> associazioni    #bind_rows permette di tramutare una lista (il risultato di lapply) in un dataframe, lo salvo in un elemento
+
+associazioni
+
+#"plottiamo" i risultati
+ggplot(associazioni, aes(x = exp, y = RR))+ #da dove deve prendere i dati ggplot?
+  geom_bar(stat = "identity")+              #cosa deve disegnare? - stat = "identity" serve per far utilizzare in modo "diretto" i miei dati
+  theme(axis.text.x = element_text(angle = 90)) #ruoto il testo in modo che sia comprensibile
+
+#appare evidente che "vanilla.ice.cream" sia il colpevole
+#"chocolate.ice.cream" ha l' RR più basso (chi mangia il gelato alla vaniglia non mangia quello al cioccolato e viceversa)
+
+calcolo_RR_OR("chocolate.ice.cream","vanilla.ice.cream",oswego) #chi mangia il gelato al cioccolato ha più del 35% di probabilità in meno di mangiare quello alla vaniglia
+
+#il rapporto tra RR e OR è tutt'altro che lineare...
+plot(associazioni$RR, associazioni$OR, xlim = c(0,25), ylim = c(0,25))
+lines(x = c(0,25), y = c(0,25), col = "red")
+
 
 # qual ? il rischio di essere malati per chi ha mangiato il prosciutto?
 # qual ? il rischio di essere malati per chi non ha mangiato il prosciutto?
