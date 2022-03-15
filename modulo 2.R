@@ -40,7 +40,7 @@ table(oswego$baked.ham, oswego$ill) %>% prop.table(1) #prima le righe, poi le co
 .63/.586 #= 1.075
 
 #un'altra misura di associazione spesso utilizzata è l' ODDS RATIO
-#l'odds ratio si basa sul rapporto tra ODDS. L'odds negli esposti è (N. malati esposti)/(N. non-malati esposti)
+#l'odds ratio si basa sul rapporto tra ODDS. L'odds negli esposti è (N. esposti malati)/(N. esposti non-malati)
 #nel nostro esempio
 table(oswego$baked.ham, oswego$ill)
 29/17 #1.71 odds negli esposti
@@ -118,7 +118,8 @@ alimenti <- colnames(oswego)[8:21] #creo un vettore contenente tutti i cibi
 
 lapply(alimenti, function(x) {              #applica la funzione a tutti gli elementi di "alimenti"
         calcolo_RR_OR(x,"ill",oswego)       #ogni alimento, a turno, prederà il posto di "x" nella funzione
-      }) %>% bind_rows() -> associazioni    #bind_rows permette di tramutare una lista (il risultato di lapply) in un dataframe, lo salvo in un elemento
+      }) %>% bind_rows() -> associazioni    #bind_rows permette di tramutare una lista (il risultato di lapply) in un dataframe, 
+                                            #lo salvo in un elemento
 
 associazioni
 
@@ -130,102 +131,60 @@ ggplot(associazioni, aes(x = exp, y = RR))+ #da dove deve prendere i dati ggplot
 #appare evidente che "vanilla.ice.cream" sia il colpevole
 #"chocolate.ice.cream" ha l' RR più basso (chi mangia il gelato alla vaniglia non mangia quello al cioccolato e viceversa)
 
-calcolo_RR_OR("chocolate.ice.cream","vanilla.ice.cream",oswego) #chi mangia il gelato al cioccolato ha più del 35% di probabilità in meno di mangiare quello alla vaniglia
+calcolo_RR_OR("chocolate.ice.cream","vanilla.ice.cream",oswego) #chi mangia il gelato al cioccolato ha più del 35% di probabilità 
+                                                                #in meno di mangiare quello alla vaniglia
 
 #il rapporto tra RR e OR è tutt'altro che lineare...
 plot(associazioni$RR, associazioni$OR, xlim = c(0,25), ylim = c(0,25))
 lines(x = c(0,25), y = c(0,25), col = "red")
 
 
-# qual ? il rischio di essere malati per chi ha mangiato il prosciutto?
-# qual ? il rischio di essere malati per chi non ha mangiato il prosciutto?
-# calcoliamo RR...
-# e gli odds/odds ratios...?
-
-
-#ATTIVITA 1: scegliete un alimento e calcolate RR e OR
-#
-#
-#
-#
-#
-#
-alimenti <- colnames(oswego)[8:21]
-rr.alimenti <- c()
-or.alimenti <- c()
-for (alimento.x in alimenti) {
-  rr.x <- readline(prompt = paste0("RR per ", alimento.x, " "))
-  or.x <- readline(prompt = paste0("OR per ", alimento.x, " "))
-  rr.alimenti <- c(rr.alimenti, rr.x)
-  or.alimenti <- c(or.alimenti, or.x)
-}
-data.frame(alimento = alimenti,
-           RR = rr.alimenti,
-           OR = or.alimenti)
-
-#qual ? l'alimento che pi? probabilmente ha dato malattia?
-
-
-
-#####possibili soluzioni pi? rapide
-
-oswego %>% 
-  select(id,ill,baked.ham:fruit.salad) %>% 
-  gather(key=alimento, value=assunto, -id, -ill) %>% 
-  group_by(alimento,assunto) %>% 
-  count(ill) %>% 
-  mutate(prop=n/sum(n)) %>% 
-  filter(ill=="Y") %>% 
-  group_by(alimento) %>% 
-  mutate(RR=prop/first(prop)) %>%
-  filter(assunto=="Y")
-
-
-apply(oswego[,8:21],2, function(cibo){
-  risk.tab = table(cibo,oswego$ill) %>% prop.table(.,1)
-  return(round(risk.tab[2,2] / risk.tab[1,2],2))
-})
-
-
-####CAMBIAMO DATASET
+#########################################CAMBIAMO DATASET
 df <- lung
+
 ?lung
+#questi dati vengono dal North Central Caner Treatment group e riportano la sopravvivenza di pazienti
+#affetti da K. polmone avanzato
+
 str(lung)
+
+#il nostro OBIETTIVO è capire se c'è un'associazione tra l'ecog performance score
+#e la morte
+
 
 #ci concentriamo su egoc performance score (ph.ecog)
 table(df$ph.ecog)
-#dividiamo in due classi... 3 pu? essere accorpata a 2 
+
+#per semplificare creaiamo 2 classi. Inoltre, il livello più alto contiene pochi elementi
+#potremmo anche scegliere di eliminarlo... ma in questo caso lo accorpiamo alla classe precedente
 df$ecog.class <- ifelse(df$ph.ecog >= 2, "2+", "0-1")
-table(df$ph.ecog, df$ecog.class) #"misura due volte, taglia una volta"
+
+#mi assicuro che le principali variabili siano codificate in modo corretto (factor)
 df$sex <- factor(df$sex, levels = c(1,2), labels=c("M","F"))
 df$status <- factor(df$status, levels = c(1,2), labels = c("vivo","morto"))
 
 
-table(df$ecog.class,df$status)
-# utilizziamo RR o OR per indagare questa associazione? 
-# qual ? il rischio se ecog >= 2
-# calcola OR e RR per ecog >= 2 vs ecog < 2
-# la ragione della differenza tra rischio e OR?
+table(df$status) %>% prop.table() #mortalità = 72.4% 
 
+#proviamo una funzione di R (epitools) per il calcolo di RR
 riskratio(df$ecog.class, df$status)
-#quale interpretazione date dei 95%CI?
-#quale interpretazione date delle p?
-oddsratio(df$ecog.class,df$status)
-oddsratio.wald(df$ecog.class,df$status)
 
-#COSA CONCLUDIAMO, alla fine?
-#
-#
-#
-#
-#
-#pensa al DAG della relazione ecog --> morte: quale(i) potenziali fattori confondenti ti vengono in mente?
-#
-#
-#
-#
-#
-##AGE
+#oltre alla stima puntuale di RR (1.305), ci vengono forniti anche gli intervalli di confidenza al 95%
+#come si interpretano? se ripetessimo questo studio un numero elevatissimo di volte, 
+#il nostro RR cadrebbe nell'intervallo 1.13-1.51 il 95% delle volte
+#oppure, noi siamo fiduciosi al 95% che il valore di RR nella popolazione (questo valore non potremo mai conoscerlo!)
+#stia all'interno di questi valori
+
+#e per la p?
+#quando si vede un p, si pensa sempre ad un test di ipotesi
+#il test sarà basato su un'ipotesi nulla ed un'ipotesi alternativa
+#la p indica la probabilità di ottenere valori come quelli osservati (1.305) o più estremi
+#posto che nella popolazione sia vera l'ipotesi alternativa (RR = 1).
+#quindi....
+#la probabilità di ottenere RR >= 1.30 nel mio campione, posto che nella popolazione RR = 1 
+#è inferiore allo 0.5% (a prescindere dal test che utilizzo)
+
+
 
 df$age.2cat <- ntile(df$age, 2)
 
