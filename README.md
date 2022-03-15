@@ -1,4 +1,5 @@
-# corso di statistica ed epidemiologia della Società Italiana di Gerontologia e Geriatria
+# Corso di statistica ed epidemiologia  
+# Società Italiana di Gerontologia e Geriatria
 
 In questo repository troverai le sintassi utilizzate durante i moduli del corso.  
 
