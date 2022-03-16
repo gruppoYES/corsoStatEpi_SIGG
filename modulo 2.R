@@ -273,81 +273,67 @@ riskratio(df$ecog.class[df$age.2cat == 2], df$status[df$age.2cat == 2]) #1.13 (0
 #le nostre "certezze crollano" tra gli anziani...se ripetessimo un numero altissimo di volte l'esperimento,
 #potremmo anche ottenere RR = 1 (nessuna associazione) o RR < 1 (ecog è protettivo nei confronti della morte tra gli anziani...)
 
+#esistono modifiche della formula di Mantel-Haenszel che permettono di ottenere un RR pesato.
+#usiamo epi.2by2
 
+?epi.2by2
+#guardando l'help di epi.2by2, ci rendiamo conto che il comando si aspetta una tabella "ribaltata"
+#rispetto a quelle fatte finora. 
 
+tab.conf
 
-table(df$ecog.class, df$status) 
-table(df$ecog.class, df$status, df$age.2cat)
-#OR per i giovani? 
-#
-#
-#
-#-Haldane-Anscombe correction
-#OR per i vecchi? 
-mantelhaen.test(table(df$ecog.class, df$status, df$age.2cat)) #age.adjOR
+tab.conf.2 <- tab.conf[c(2,1),c(2,1),c(1,2)]
 
-df$age.5cat <- ntile(df$age,5)
-mantelhaen.test(table(df$ecog.class, df$status, df$age.5cat)) #age.adjOR
+epi.2by2(tab.conf.2, method = "cohort.count") #RRadj è molto simile ad RR
+#forse age è proprio un effect modifier della relazione ecog --> morte
 
-#estrema cautela!!!
-
-mantelhaen.RR(table(df$ecog.class,df$status,df$age.2cat))
-#### oppure
-?epi.2by2 #ATTENZIONE ALL' ORDINE DELLA TABELLA RICHIESTA
-cont.table <- table(df$ecog.class,df$status,df$age.2cat)
-cont.table <- cont.table[c(2,1),c(2,1),c(1,2)]
-epi.2by2(cont.table, method = "cohort.count")
-
-
-
-
-#################ACT.2 = provate a fare lo stesso ragionamento usando M e F come strati
-#
-#
-#
-#
-#
-#
-table(df$ecog.class, df$status, df$sex)
-#OR maschi = 8.8
-#OR femmine = 2.8
-mantelhaen.test(table(df$ecog.class, df$status, df$sex)) #4.137
-mantelhaen.RR(table(df$ecog.class, df$status, df$sex))
-#effect modification?
-
-cont.table <- table(df$ecog.class,df$status,df$sex)
-cont.table <- cont.table[c(2,1),c(2,1),c(1,2)]
-epi.2by2(cont.table, method = "cohort.count")
-
-
-############incidence rate
+############INCIDENCE RATE
 #concentriamoci sul tempo
-#perch? scegliere un rate ratio invece di un risk ratio?
-df$ID <- seq_len(nrow(df))
+#quando parliamo di morte, in particolare, la questione "tempo" diventa di fondamentale importanza
+#con un follow-up abbastanza lungo, il rischio di morire di chiunque è = 1
+
+#plottiamo i nostri partecipanti in riferimento al tempo
+df$ID <- seq_len(nrow(df)) #assegno un ID (seq_len vuol dire crea una sequenza da 1 a "x")
 
 
 ggplot(df) +
-  geom_segment(aes(y = ID, x = 0, xend = time, yend = ID))+
-  geom_point(aes(x = time, y = ID, shape = status, colour = status), alpha = .7)+
-  xlab("time, days")+
+  geom_segment(aes(y = ID, x = 0, xend = time, yend = ID))+ #crea un segmento che,
+                                                            #sulle x va da 0 al tempo di osservazione
+                                                            #sulle y rimane all'altezza dell' ID
+  geom_point(aes(x = time, y = ID, shape = status, colour = status), alpha = .7)+ #metti un punto in fondo (time,ID),
+                                                                                  #con colore e forma a seconda dello stato
+  xlab("time, days")+ #cambio le labels
   ylab("participant ID")+
   theme_bw()
 
+#se voglio evitare di avere 228 linee (difficili da interpretare), posso visualizzare un campione random
 
+ggplot(df[sample(seq_len(nrow(df)),20),]) +
+  geom_segment(aes(y = ID, x = 0, xend = time, yend = ID))+ #crea un segmento che,
+  #sulle x va da 0 al tempo di osservazione
+  #sulle y rimane all'altezza dell' ID
+  geom_point(aes(x = time, y = ID, shape = status, colour = status), alpha = .7)+ #metti un punto in fondo (time,ID),
+  #con colore e forma a seconda dello stato
+  xlab("time, days")+ #cambio le labels
+  ylab("participant ID")+
+  theme_bw()
 
-df %>% 
-  filter(!is.na(ecog.class)) %>%
-  group_by(ecog.class) %>% 
-  summarise(event=sum(status=="morto"),
-            futime=sum(time)) %>% 
-  column_to_rownames("ecog.class") %>% 
-  as.matrix -> rate.tab
+#un incidence rate non è altro che il (N di eventi / il tempo totale di esposizione)
+#creiamo la tabella 2x2 con dyplr
+
+df %>%                                  #parto dal df
+  filter(!is.na(ecog.class)) %>%        #elimino i missing per ecog.class
+  group_by(ecog.class) %>%              #raggruppo per ecog.class
+  summarise(event=sum(status=="morto"), #chiedo 2 statistiche
+                                          #il totale dei morti
+            futime=sum(time)) %>%         #la somma dei tempi
+  column_to_rownames("ecog.class") %>%  #modifico la tabella
+  as.matrix -> rate.tab                 #ne faccio una matrice e me la salvo
 
 rate.tab #calcoliamo IR per ecog basso e alto
-45/11822
-(45/11822)*365.25 #1.39
+45/11822 #= 0.004 eventi/giorni-persona tra chi ha ecog 2+
+(45/11822)*1000 #3.8 per 1000 giorni-persona
 
-(119/57700)*365.25 #.75
 
 
 rateratio(rate.tab)

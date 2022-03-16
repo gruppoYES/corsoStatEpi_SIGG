@@ -9,7 +9,7 @@ Puoi contattarci via gruppoyes@sigg.it
 
 
 ### Modulo 2
-* misure di associazione: Risk Ratio, Odds Ratio, Incidence Ratio
+* misure di associazione: Risk Ratio, Odds Ratio, Incidence Rate Ratio
 * sensibilità, specificità ed introduzione alla curva ROC
 * regressione lineare
 * regressione logistica
