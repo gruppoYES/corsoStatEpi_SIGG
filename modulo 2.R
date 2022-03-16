@@ -125,7 +125,8 @@ associazioni
 
 #"plottiamo" i risultati
 ggplot(associazioni, aes(x = exp, y = RR))+ #da dove deve prendere i dati ggplot?
-  geom_bar(stat = "identity")+              #cosa deve disegnare? - stat = "identity" serve per far utilizzare in modo "diretto" i miei dati
+  geom_bar(stat = "identity")+              #cosa deve disegnare? 
+                                            #stat = "identity" serve per far utilizzare in modo "diretto" i miei dati
   theme(axis.text.x = element_text(angle = 90)) #ruoto il testo in modo che sia comprensibile
 
 #appare evidente che "vanilla.ice.cream" sia il colpevole
@@ -184,13 +185,98 @@ riskratio(df$ecog.class, df$status)
 #la probabilità di ottenere RR >= 1.30 nel mio campione, posto che nella popolazione RR = 1 
 #è inferiore allo 0.5% (a prescindere dal test che utilizzo)
 
+#####CONFOUNDERS
+#pensiamo al "DAG" della relazione tra performance score e morte
+#esistono fattori che potrebbero "confondere" l'associazione
+#questi sono fattori teoricamente associati all'exposure
+#teoricamente associati all'outcome
+#ma che non sono sul pathway causale diretto tra l'exposure e l'outcome
+#NB: i confounder si scelgono in primo luogo sulla base della relazione
+#fisiologica/biologica/patologica/clinica e non sulle "p < 0.05" della tabella 1...
 
-
+#età potrebbe confondere la relazione tra ecog e morte
+#divido l'età in base alla mediana, per permettermi di stratificare le analisi
 df$age.2cat <- ntile(df$age, 2)
 
+#R offre la possibilità di calcolare l' OR secondo Cochran-Mantel-Haenszel
+#di fatto si tratta di un OR della relazione exp-->out pesato per i k strati del confounder
+
+#OR senza prendere in considerazione età
+calcolo_RR_OR("ecog.class","status",df) #OR = 3.59
+#creo una tabella 2 x 2 x k, dove k sono i livelli del mio confounder
+tab.conf <- table(df$ecog.class, df$status, df$age.2cat)
+tab.conf #diamo un'occhiata alla nostra tabella
+
+#calcoliamo l' OR di Mantel-Haenszel
+mantelhaen.test(tab.conf)  #"common odds ratio" = 3.53, l' OR è piuttosto vicino a quello
+                           # non aggiustao (3.59): l'età non sembra essere un confounder
+                           # di questa relazione.
+                           # p = 0.008, vuol dire che la probabilità di trovare un ORadj >= 3.53
+                           # nel nostro campione, se nella popolazione l' ORadj == 1 è 0.8%
+
+#proviamo a calcolare OR nei singoli strati
+calcolo_RR_OR("ecog.class","status",df[df$age.2cat == 1, ]) #l' OR è infinito!!! perchè?
+
+#guardiamo la tabella 2x2 nei giovani:
+table(df$ecog.class[df$age.2cat == 1], df$status[df$age.2cat == 1]) #ho uno zero...il che spiega il risultato
+
+#in questi casi si può utilizzare la correzione di "Haldane-Anscombe".
+#si tratta semplicemente di aggiungere 0.5 a tutte le celle prima di fare i calcoli.
+#aggiorniamo la nostra funzione...
+
+calcolo_RR_OR <- function(exposure, outcome, dat) { #la mia funzione vorrà tre argomenti. 
+                                                    #Exposure, outcome e dat sono "segnaposto" nella funzione
+  
+  #creo la mia tabella di contigenza 2x2
+  my.table <- table(dat[,exposure],dat[,outcome])
+  ################vediamo se c'è uno zero da qualche parte...
+  if (any(my.table == 0)) {
+   #################se è vero aggiungiamo .5 a tutte le celle
+   my.table <- my.table +.5
+  }
+  
+  #calcolo il rischio e faccio il rapporto
+  #utilizzo prop.table
+  RR <- prop.table(my.table,1)[2,2] / prop.table(my.table,1)[1,2]
+  #per gli odds devo calcolare "a mano"
+  #nei non esposti
+  odds.non.exp <- my.table[1,2] / my.table[1,1]
+  #negli esposti
+  odds.exp <- my.table[2,2] / my.table[2,1] 
+  OR <- odds.exp/odds.non.exp
+  
+  #riporto i risultati
+  return(data.frame(exp = exposure,
+                    RR = round(RR,3),
+                    OR = round(OR,3))) 
+}
+#facciamo girare la funzione aggiornata
 
 
-table(df$ecog.class, df$status) #OR senza et? 3.6
+calcolo_RR_OR("ecog.class","status",df[df$age.2cat == 1, ]) #l' OR è altissimo, ma non è infinito
+                                                            #si vede nuovamente quanto l' OR possa dare una stima molto diversa
+                                                            #rispetto al rischio (50% aumento del rischio vs  22 volte tanto in scala odds)
+calcolo_RR_OR("ecog.class","status",df[df$age.2cat == 2, ]) #tra gli "anziani", l' OR è 1.69
+
+#c'è una grossa differenza in OR tra "giovani" e "anziani". Questo potrebbe significare che l' età è un
+#EFFECT MODIFIER della relazione ecog --> morte. In altre parole, l'associazione tra ecog e morte è modificata
+#a seconda del livello di una terza variabile (l'età)
+#ATTENZIONE: questa "effect modification" è palese usando gli OR (dove un OR è stato corretto...). 
+#E' molto meno evidente sulla scala dei rischi: RRgiovani = 1.5 vs RRanziani = 1.12
+
+#proviamo a vedere 
+riskratio(df$ecog.class[df$age.2cat == 1], df$status[df$age.2cat == 1]) #1.57 (1.34-1.82)
+riskratio(df$ecog.class[df$age.2cat == 2], df$status[df$age.2cat == 2]) #1.13 (0.91-1.40)
+
+#se tra i giovani possiamo essere abbastanza fiduciosi del fatto che l'associazione ecog-->morte 
+#sia presente anche nella popolazione e sia positiva
+#le nostre "certezze crollano" tra gli anziani...se ripetessimo un numero altissimo di volte l'esperimento,
+#potremmo anche ottenere RR = 1 (nessuna associazione) o RR < 1 (ecog è protettivo nei confronti della morte tra gli anziani...)
+
+
+
+
+table(df$ecog.class, df$status) 
 table(df$ecog.class, df$status, df$age.2cat)
 #OR per i giovani? 
 #
